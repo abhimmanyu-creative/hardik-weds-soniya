@@ -375,8 +375,7 @@ p{margin:0}
 <div class="dock" id="dock" aria-label="Invitation controls">
   <button id="musicBtn" class="lg" aria-label="Pause music"><span class="bars"><i></i><i></i><i></i><i></i></span></button>
 </div>
-<button class="lg autobtn" id="autoBtn" aria-label="Start auto-play"><span class="ring"><svg viewBox="0 0 24 24"><circle class="track" cx="12" cy="12" r="10"/><circle class="prog" id="ringProg" cx="12" cy="12" r="10"/></svg><i id="autoIcon"></i></span><span class="lbl" id="autoLabel">Auto-play</span></button>
-<div class="toast" id="toast">Auto-play is on · touch anywhere to pause</div>
+<div class="toast" id="toast">The invitation moves on its own · touch to pause</div>
 <button class="lg tapmusic" id="tapMusic" aria-label="Play the music"><span class="bars"><i></i><i></i><i></i><i></i></span><span>Tap for music</span></button>
 <audio id="song" src="audio/song.mp3" preload="auto" loop playsinline></audio>
 
@@ -475,7 +474,7 @@ scenes.forEach((s,i)=>{s.style.zIndex=i+1;let k=0;s.querySelectorAll('.rv,.li,.s
 let geo=[];const measure=()=>{geo=scenes.map(s=>({s,stage:s.querySelector('.stage'),dim:s.querySelector('.dim'),top:s.offsetTop,h:s.offsetHeight}))};
 measure();addEventListener('resize',()=>{measure();frame()});if(document.fonts)document.fonts.ready.then(()=>{measure();frame()});
 if('ResizeObserver' in window)new ResizeObserver(()=>{measure()}).observe(document.getElementById('deck'));
-let active=-1,started=false,lite=false;const root=document.documentElement,ring=document.getElementById('ringProg');
+let active=-1,started=false,lite=false;const root=document.documentElement;
 function frame(){
   scrollQueued=false;if(!started)return;const y=scrollY,vh=innerHeight;let act=0;
   for(let i=0;i<geo.length;i++){const g=geo[i],t=g.top-y,b=t+g.h;
@@ -491,7 +490,6 @@ function frame(){
     if(g.dimO!==dimO){g.dim.style.opacity=dimO.toFixed(3);g.dimO=dimO}
   }
   if(act!==active){if(active>=0)scenes[active].classList.remove('on');active=act;scenes[act].classList.add('on')}
-  {const max=document.documentElement.scrollHeight-vh;ring.style.strokeDashoffset=(62.83*(1-(max>0?Math.min(1,y/max):0))).toFixed(2)}
 }
 let scrollQueued=false;addEventListener('scroll',()=>{if(!scrollQueued){scrollQueued=true;requestAnimationFrame(frame)}},{passive:true});
 
@@ -602,7 +600,7 @@ function openEnvelope(vDeg){
   setTimeout(()=>{const bl=document.getElementById('bloom');
     if(!reduce&&card.animate){card.animate([{transform:card.style.transform,opacity:1},{transform:'translate3d(0,0,0) scale(4.2)',opacity:0}],{duration:1100,easing:'cubic-bezier(.6,0,.4,1)',fill:'forwards'});
       bl.animate([{opacity:0},{opacity:.95,offset:.45},{opacity:0}],{duration:1500,easing:'ease-in-out'})}
-    setTimeout(()=>{gate.classList.add('fade');document.body.classList.remove('locked');started=true;measure();if(reduce)scenes.forEach(s=>s.classList.add('seen'));frame();document.getElementById('dock').classList.add('show');document.getElementById('autoBtn').classList.add('show')},reduce?0:480);
+    setTimeout(()=>{gate.classList.add('fade');document.body.classList.remove('locked');started=true;measure();if(reduce)scenes.forEach(s=>s.classList.add('seen'));frame();document.getElementById('dock').classList.add('show')},reduce?0:480);
   },2050*T);
   setTimeout(()=>{gate.remove();if(wanted&&song.paused)blocked();setTimeout(()=>Auto.start(true),3000);},3400*T);
 }
@@ -635,15 +633,13 @@ const Scratch=(function(){
 })();
 
 
-/* ================= auto-play =================
-   One easing curve on every device (never the browser's own smooth-scroll speed), scene snapping paused while it plays,
-   reading time from each scene's words, tall scenes drift through at reading pace, any touch hands control back. */
+/* ================= auto-play (always on) =================
+   Glides scene to scene with one easing curve on every device, gives each scene its reading time, drifts through tall scenes.
+   Any touch, swipe, wheel, key or click steps it aside; two seconds after the guest's last input it carries on from where they are. */
 const Auto=(function(){
-  const btn=document.getElementById('autoBtn'),label=document.getElementById('autoLabel'),icon=document.getElementById('autoIcon'),toast=document.getElementById('toast');
-  const playI='<svg viewBox="0 0 10 10"><path d="M2 1l7 4-7 4z"/></svg>',pauseI='<svg viewBox="0 0 10 10"><path d="M2 1h2v8H2zM6 1h2v8H6z"/></svg>';
-  let playing=false,token=0,touched=false,begun=false,snapHeld=false;
+  const toast=document.getElementById('toast'),IDLE=2000;
+  let playing=false,token=0,begun=false,finished=false,snapHeld=false,idleT=0,lastInput=0;
   const vh=()=>innerHeight,maxY=()=>root.scrollHeight-vh();
-  /* a clock that stops while the guest is in another app, so nothing jumps when they come back */
   let hiddenAt=0,hiddenTotal=0;document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=performance.now();else if(hiddenAt){hiddenTotal+=performance.now()-hiddenAt;hiddenAt=0}});
   const clock=()=>performance.now()-hiddenTotal;
   const inOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2, drift=t=>-(Math.cos(Math.PI*t)-1)/2;
@@ -656,17 +652,17 @@ const Auto=(function(){
   const travel=d=>Math.min(2400,Math.max(1100,900+Math.abs(d)*.55));
   const readMs=g=>1000*(+g.s.dataset.read||Math.min(13,Math.max(4,2.5+(g.s.innerText||'').split(/\s+/).filter(Boolean).length*.26)));
   function sceneAt(y){measure();let i=0;for(let k=0;k<geo.length;k++)if(geo[k].top<=y+vh()*.5)i=k;return i}
-  function ui(){const end=scrollY>=maxY()-4;btn.setAttribute('aria-label',playing?'Pause auto-play':(begun?(end?'Replay':'Resume auto-play'):'Start auto-play'));
-    icon.innerHTML=playing?pauseI:playI;label.textContent=playing?'Pause':(begun?(end?'Replay':'Resume'):'Auto-play')}
   async function run(resume){
-    const my=++token;playing=true;begun=true;holdSnap();ui();measure();
-    if(scrollY>=maxY()-4){if(!await glide(0,2000))return;if(!await wait(500))return;resume=false}
+    const my=++token;playing=true;begun=true;finished=false;holdSnap();measure();
     let i=sceneAt(scrollY);
-    if(resume){const g=geo[i];const end=g.top+Math.max(0,g.h-vh());
-      if(g.h>vh()+8&&scrollY<end-12&&scrollY>=g.top-12){ /* finish the tall scene from where the guest is */
-        const left=(end-scrollY)/(g.h-vh());if(!await wait(400))return;if(!await glide(end,Math.max(1500,readMs(g)*.75*left),drift))return;if(!await wait(700))return}
-      else if(Math.abs(scrollY-g.top)>12){if(!await wait(300))return;if(!await glide(g.top,travel(g.top-scrollY)))return;if(!await wait(readMs(g)*.6))return}
-      else{if(!await wait(500))return}
+    if(resume){const g=geo[i],end=g.top+Math.max(0,g.h-vh());
+      if(g.h>vh()+8&&scrollY>=g.top-12&&scrollY<end-12){ /* inside a tall scene: finish it from here */
+        const left=(end-scrollY)/(g.h-vh());if(!await glide(end,Math.max(1500,readMs(g)*.75*left),drift))return;if(!await wait(900))return}
+      else if(Math.abs(scrollY-g.top)>12&&scrollY<end-12){ /* between scenes: settle onto the nearest one, then read it */
+        if(!await glide(g.top,travel(g.top-scrollY)))return;if(!await wait(readMs(g)*.6))return}
+      else{ /* the guest stopped on a scene: give them time to read it */
+        if(g.s.id==='save'&&!Scratch.revealed){if(!await wait(900))return;await Scratch.auto();if(my!==token)return;if(!await wait(2200))return}
+        else if(!await wait(readMs(g)*.6))return}
       i++}
     for(;i<geo.length;i++){
       if(my!==token)return;measure();const g=geo[i],h=vh();
@@ -676,19 +672,25 @@ const Auto=(function(){
       if(g.h<=h+8){if(!await wait(read))return}
       else{const end=g.top+g.h-h;if(!await wait(read*.25))return;if(!await glide(end,Math.max(1600,read*.75,(end-g.top)/38*1000),drift))return;if(!await wait(900))return}
     }
-    if(my===token){playing=false;releaseSnap();ui()}
+    if(my===token){playing=false;finished=true;releaseSnap()}
   }
-  function pause(){if(!playing)return;token++;playing=false;ui();/* snapping returns once the guest's own scroll settles */}
-  function start(first){if(first&&(reduce||touched)){ui();return}run(!first&&begun);
-    if(first){toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),4200)}}
-  btn.addEventListener('click',()=>playing?pause():start(false));
-  const stop=e=>{if(e.type!=='wheel'&&e.target&&e.target.closest&&e.target.closest('.autobtn,.dock,.tapmusic,.gate'))return;if(e.target&&e.target.closest&&e.target.closest('.gate'))return;if(!document.getElementById('gate'))touched=true;if(playing){pause();toast.classList.remove('show')}};
-  ['wheel','touchstart','mousedown'].forEach(t=>addEventListener(t,stop,{passive:true,capture:true}));
-  addEventListener('keydown',e=>{if(['ArrowDown','ArrowUp','PageDown','PageUp',' ','Home','End'].includes(e.key)||!e.target.closest||!e.target.closest('.autobtn'))stop(e)},{capture:true});
+  function schedule(){clearTimeout(idleT);idleT=setTimeout(()=>{if(playing||document.getElementById('gate'))return;
+      if(performance.now()-lastInput<IDLE-50)return schedule();
+      if(finished&&scrollY>=maxY()-vh()*.5)return; /* the guest is at the end: stay */
+      run(begun)},IDLE)}
+  /* any input from the guest: step aside now, carry on two seconds after the last one */
+  function input(e){if(document.getElementById('gate'))return;if(e&&e.target&&e.target.closest&&e.target.closest('.dock,.tapmusic'))return;
+    lastInput=performance.now();if(playing){token++;playing=false;toast.classList.remove('show')}if(begun||idleT)schedule()}
+  ['wheel','touchstart','touchmove','touchend','mousedown','keydown'].forEach(t=>addEventListener(t,input,{passive:true,capture:true}));
+  /* the guest's own scrolling (including momentum after a flick) also counts as input */
+  addEventListener('scroll',()=>{if(playing||document.getElementById('gate'))return;lastInput=performance.now();if(begun||idleT)schedule()},{passive:true});
   const settle=()=>{if(!playing&&snapHeld)releaseSnap()};
   if('onscrollend' in window)addEventListener('scrollend',settle);else{let st;addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(settle,180)},{passive:true})}
   addEventListener('resize',()=>{if(playing)measure()});
-  ui();return {start,pause,get playing(){return playing}};
+  function start(){if(reduce)return;
+    if(performance.now()-lastInput<IDLE){schedule();return}
+    run(false);toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),4200)}
+  return {start,get playing(){return playing}};
 })();
 </script>
 </body>
