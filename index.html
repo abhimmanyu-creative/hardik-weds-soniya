@@ -169,6 +169,16 @@ p{margin:0}
 .toast{position:fixed;z-index:50;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translate3d(-50%,10px,0);opacity:0;pointer-events:none;
   padding:8px 14px;border-radius:999px;background:rgba(20,2,6,.8);font-style:italic;font-size:.92rem;color:var(--iv2);white-space:nowrap;transition:opacity .5s,transform .6s var(--se)}
 .toast.show{opacity:1;transform:translate3d(-50%,0,0)}
+.autobtn{position:fixed;z-index:50;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:center;gap:9px;height:48px;padding:0 18px 0 13px;border-radius:999px;cursor:pointer;
+  font-family:var(--f-display);font-size:.62rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;
+  transform:translate3d(0,160%,0);transition:transform .8s var(--se)}
+.autobtn.show{transform:translate3d(0,0,0)}
+@media (max-width:359px){.autobtn{padding:0;width:48px;justify-content:center}.autobtn .lbl{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
+.toast{position:fixed;z-index:50;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translate3d(-50%,10px,0);opacity:0;pointer-events:none;
+  width:max-content;max-width:calc(100vw - 32px);text-align:center;padding:9px 16px;border-radius:999px;background:rgba(20,2,6,.82);
+  font-style:italic;font-size:.92rem;line-height:1.3;color:var(--iv2);transition:opacity .5s,transform .6s var(--se)}
+.toast.show{opacity:1;transform:translate3d(-50%,0,0)}
 .tapmusic{position:fixed;z-index:51;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translate3d(0,20px,0) scale(.9);opacity:0;pointer-events:none;
   display:flex;align-items:center;gap:10px;height:50px;padding:0 22px;border-radius:999px;cursor:pointer;font-family:var(--f-display);font-size:.7rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;
   transition:opacity .5s ease,transform .7s var(--se)}
@@ -365,6 +375,8 @@ p{margin:0}
 <div class="dock" id="dock" aria-label="Invitation controls">
   <button id="musicBtn" class="lg" aria-label="Pause music"><span class="bars"><i></i><i></i><i></i><i></i></span></button>
 </div>
+<button class="lg autobtn" id="autoBtn" aria-label="Start auto-play"><span class="ring"><svg viewBox="0 0 24 24"><circle class="track" cx="12" cy="12" r="10"/><circle class="prog" id="ringProg" cx="12" cy="12" r="10"/></svg><i id="autoIcon"></i></span><span class="lbl" id="autoLabel">Auto-play</span></button>
+<div class="toast" id="toast">Auto-play is on · touch anywhere to pause</div>
 <button class="lg tapmusic" id="tapMusic" aria-label="Play the music"><span class="bars"><i></i><i></i><i></i><i></i></span><span>Tap for music</span></button>
 <audio id="song" src="audio/song.mp3" preload="auto" loop playsinline></audio>
 
@@ -463,7 +475,7 @@ scenes.forEach((s,i)=>{s.style.zIndex=i+1;let k=0;s.querySelectorAll('.rv,.li,.s
 let geo=[];const measure=()=>{geo=scenes.map(s=>({s,stage:s.querySelector('.stage'),dim:s.querySelector('.dim'),top:s.offsetTop,h:s.offsetHeight}))};
 measure();addEventListener('resize',()=>{measure();frame()});if(document.fonts)document.fonts.ready.then(()=>{measure();frame()});
 if('ResizeObserver' in window)new ResizeObserver(()=>{measure()}).observe(document.getElementById('deck'));
-let active=-1,started=false,lite=false;const root=document.documentElement;
+let active=-1,started=false,lite=false;const root=document.documentElement,ring=document.getElementById('ringProg');
 function frame(){
   scrollQueued=false;if(!started)return;const y=scrollY,vh=innerHeight;let act=0;
   for(let i=0;i<geo.length;i++){const g=geo[i],t=g.top-y,b=t+g.h;
@@ -479,6 +491,7 @@ function frame(){
     if(g.dimO!==dimO){g.dim.style.opacity=dimO.toFixed(3);g.dimO=dimO}
   }
   if(act!==active){if(active>=0)scenes[active].classList.remove('on');active=act;scenes[act].classList.add('on')}
+  {const max=document.documentElement.scrollHeight-vh;ring.style.strokeDashoffset=(62.83*(1-(max>0?Math.min(1,y/max):0))).toFixed(2)}
 }
 let scrollQueued=false;addEventListener('scroll',()=>{if(!scrollQueued){scrollQueued=true;requestAnimationFrame(frame)}},{passive:true});
 
@@ -589,9 +602,9 @@ function openEnvelope(vDeg){
   setTimeout(()=>{const bl=document.getElementById('bloom');
     if(!reduce&&card.animate){card.animate([{transform:card.style.transform,opacity:1},{transform:'translate3d(0,0,0) scale(4.2)',opacity:0}],{duration:1100,easing:'cubic-bezier(.6,0,.4,1)',fill:'forwards'});
       bl.animate([{opacity:0},{opacity:.95,offset:.45},{opacity:0}],{duration:1500,easing:'ease-in-out'})}
-    setTimeout(()=>{gate.classList.add('fade');document.body.classList.remove('locked');started=true;measure();if(reduce)scenes.forEach(s=>s.classList.add('seen'));frame();document.getElementById('dock').classList.add('show')},reduce?0:480);
+    setTimeout(()=>{gate.classList.add('fade');document.body.classList.remove('locked');started=true;measure();if(reduce)scenes.forEach(s=>s.classList.add('seen'));frame();document.getElementById('dock').classList.add('show');document.getElementById('autoBtn').classList.add('show')},reduce?0:480);
   },2050*T);
-  setTimeout(()=>{gate.remove();if(wanted&&song.paused)blocked();},3400*T);
+  setTimeout(()=>{gate.remove();if(wanted&&song.paused)blocked();setTimeout(()=>Auto.start(true),3000);},3400*T);
 }
 
 /* ================= scratch card ================= */
@@ -621,6 +634,62 @@ const Scratch=(function(){
   return {auto,get revealed(){return revealed}};
 })();
 
+
+/* ================= auto-play =================
+   One easing curve on every device (never the browser's own smooth-scroll speed), scene snapping paused while it plays,
+   reading time from each scene's words, tall scenes drift through at reading pace, any touch hands control back. */
+const Auto=(function(){
+  const btn=document.getElementById('autoBtn'),label=document.getElementById('autoLabel'),icon=document.getElementById('autoIcon'),toast=document.getElementById('toast');
+  const playI='<svg viewBox="0 0 10 10"><path d="M2 1l7 4-7 4z"/></svg>',pauseI='<svg viewBox="0 0 10 10"><path d="M2 1h2v8H2zM6 1h2v8H6z"/></svg>';
+  let playing=false,token=0,touched=false,begun=false,snapHeld=false;
+  const vh=()=>innerHeight,maxY=()=>root.scrollHeight-vh();
+  /* a clock that stops while the guest is in another app, so nothing jumps when they come back */
+  let hiddenAt=0,hiddenTotal=0;document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=performance.now();else if(hiddenAt){hiddenTotal+=performance.now()-hiddenAt;hiddenAt=0}});
+  const clock=()=>performance.now()-hiddenTotal;
+  const inOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2, drift=t=>-(Math.cos(Math.PI*t)-1)/2;
+  function holdSnap(){if(!snapHeld){snapHeld=true;root.style.scrollSnapType='none'}}
+  function releaseSnap(){if(snapHeld){snapHeld=false;root.style.scrollSnapType=''}}
+  function glide(to,ms,ease=inOut){const my=token;to=Math.max(0,Math.min(maxY(),Math.round(to)));const from=scrollY;
+    return new Promise(res=>{if(Math.abs(to-from)<2)return res(true);if(reduce){window.scrollTo(0,to);return res(true)}
+      const t0=clock();const step=()=>{if(my!==token)return res(false);const k=Math.min(1,(clock()-t0)/ms);window.scrollTo(0,from+(to-from)*ease(k));k<1?requestAnimationFrame(step):res(true)};requestAnimationFrame(step)})}
+  const wait=ms=>{const my=token;return new Promise(res=>{const t0=clock();const step=()=>{if(my!==token)return res(false);clock()-t0>=ms?res(true):requestAnimationFrame(step)};requestAnimationFrame(step)})};
+  const travel=d=>Math.min(2400,Math.max(1100,900+Math.abs(d)*.55));
+  const readMs=g=>1000*(+g.s.dataset.read||Math.min(13,Math.max(4,2.5+(g.s.innerText||'').split(/\s+/).filter(Boolean).length*.26)));
+  function sceneAt(y){measure();let i=0;for(let k=0;k<geo.length;k++)if(geo[k].top<=y+vh()*.5)i=k;return i}
+  function ui(){const end=scrollY>=maxY()-4;btn.setAttribute('aria-label',playing?'Pause auto-play':(begun?(end?'Replay':'Resume auto-play'):'Start auto-play'));
+    icon.innerHTML=playing?pauseI:playI;label.textContent=playing?'Pause':(begun?(end?'Replay':'Resume'):'Auto-play')}
+  async function run(resume){
+    const my=++token;playing=true;begun=true;holdSnap();ui();measure();
+    if(scrollY>=maxY()-4){if(!await glide(0,2000))return;if(!await wait(500))return;resume=false}
+    let i=sceneAt(scrollY);
+    if(resume){const g=geo[i];const end=g.top+Math.max(0,g.h-vh());
+      if(g.h>vh()+8&&scrollY<end-12&&scrollY>=g.top-12){ /* finish the tall scene from where the guest is */
+        const left=(end-scrollY)/(g.h-vh());if(!await wait(400))return;if(!await glide(end,Math.max(1500,readMs(g)*.75*left),drift))return;if(!await wait(700))return}
+      else if(Math.abs(scrollY-g.top)>12){if(!await wait(300))return;if(!await glide(g.top,travel(g.top-scrollY)))return;if(!await wait(readMs(g)*.6))return}
+      else{if(!await wait(500))return}
+      i++}
+    for(;i<geo.length;i++){
+      if(my!==token)return;measure();const g=geo[i],h=vh();
+      if(!await glide(g.top,travel(g.top-scrollY)))return;
+      const read=readMs(g);
+      if(g.s.id==='save'&&!Scratch.revealed){if(!await wait(1100))return;await Scratch.auto();if(my!==token)return;if(!await wait(2400))return;continue}
+      if(g.h<=h+8){if(!await wait(read))return}
+      else{const end=g.top+g.h-h;if(!await wait(read*.25))return;if(!await glide(end,Math.max(1600,read*.75,(end-g.top)/38*1000),drift))return;if(!await wait(900))return}
+    }
+    if(my===token){playing=false;releaseSnap();ui()}
+  }
+  function pause(){if(!playing)return;token++;playing=false;ui();/* snapping returns once the guest's own scroll settles */}
+  function start(first){if(first&&(reduce||touched)){ui();return}run(!first&&begun);
+    if(first){toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),4200)}}
+  btn.addEventListener('click',()=>playing?pause():start(false));
+  const stop=e=>{if(e.type!=='wheel'&&e.target&&e.target.closest&&e.target.closest('.autobtn,.dock,.tapmusic,.gate'))return;if(e.target&&e.target.closest&&e.target.closest('.gate'))return;if(!document.getElementById('gate'))touched=true;if(playing){pause();toast.classList.remove('show')}};
+  ['wheel','touchstart','mousedown'].forEach(t=>addEventListener(t,stop,{passive:true,capture:true}));
+  addEventListener('keydown',e=>{if(['ArrowDown','ArrowUp','PageDown','PageUp',' ','Home','End'].includes(e.key)||!e.target.closest||!e.target.closest('.autobtn'))stop(e)},{capture:true});
+  const settle=()=>{if(!playing&&snapHeld)releaseSnap()};
+  if('onscrollend' in window)addEventListener('scrollend',settle);else{let st;addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(settle,180)},{passive:true})}
+  addEventListener('resize',()=>{if(playing)measure()});
+  ui();return {start,pause,get playing(){return playing}};
+})();
 </script>
 </body>
 </html>
